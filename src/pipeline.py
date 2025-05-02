@@ -98,10 +98,10 @@ def movie_plot_ml_pipeline():
     df_preprocessed = preprocess_data_step(df_valid)
     _ = version_data_step(df_preprocessed)
     _ = create_feature_parquet_step(df_preprocessed)
-    #feast_apply_and_materialize_step()
+    feast_apply_and_materialize_step()
 
 if __name__ == "__main__":
     client = Client()
     pipeline_instance = movie_plot_ml_pipeline()
-    run = pipeline_instance.run()
+    run = pipeline_instance
     print(f"Started pipeline run: {run}")
