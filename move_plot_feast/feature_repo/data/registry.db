@@ -1,1 +1,22 @@
-1"$4ae69bd5-698f-4d24-8f99-dae9bcba78d1*èÌÔÀğĞ‹¸
+
+]
+=
+movie_idUnique movie id"movie_idJmovie_plot_retrieval
+ÛÍÔÀà £†ÛÍÔÀà £†
+K
++
+__dummy"
+__dummy_idJmovie_plot_retrieval
+ÛÍÔÀĞ·«†ÛÍÔÀĞ·«†1"$77318079-714e-453d-b073-f041f70bea1b*ÛÍÔÀàºÄ†2œ
+û
+movie_featuresmovie_plot_retrievalmovie_id"
+tfidf_1"
+tfidf_2:event_timestampZjh/Users/amalayrania/Desktop/Movie Plot Retrieval/move_plot_feast/feature_repo/data/movie_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢h/Users/amalayrania/Desktop/Movie Plot Retrieval/move_plot_feast/feature_repo/data/movie_features.parquet@b
+movie_id
+ÛÍÔÀ ¾®†ÛÍÔÀ ¾®†R¼
+¹
+,feast.infra.online_stores.sqlite.SqliteTable"ˆ
+a/Users/amalayrania/Desktop/Movie Plot Retrieval/move_plot_feast/feature_repo/data/online_store.db#movie_plot_retrieval_movie_featuresbµevent_timestampZjh/Users/amalayrania/Desktop/Movie Plot Retrieval/move_plot_feast/feature_repo/data/movie_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢h/Users/amalayrania/Desktop/Movie Plot Retrieval/move_plot_feast/feature_repo/data/movie_features.parquetªmovie_plot_retrievalŠ4
+
+movie_plot_retrieval
+ÛÍÔÀÀ²Š{ÛÍÔÀÀ²Š{
