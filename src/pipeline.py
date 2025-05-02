@@ -25,7 +25,7 @@ def ingest_data_step() -> pd.DataFrame:
 
 @step(enable_cache=False)
 def validate_data_step(df: pd.DataFrame) -> pd.DataFrame:
-    df_valid = validate_data(df)
+    df_valid, _ = validate_data(df)  
     return df_valid
 
 @step(enable_cache=False)
@@ -98,7 +98,7 @@ def movie_plot_ml_pipeline():
     df_preprocessed = preprocess_data_step(df_valid)
     _ = version_data_step(df_preprocessed)
     _ = create_feature_parquet_step(df_preprocessed)
-    feast_apply_and_materialize_step()
+    #feast_apply_and_materialize_step()
 
 if __name__ == "__main__":
     client = Client()

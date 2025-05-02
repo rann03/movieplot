@@ -1,0 +1,6 @@
+[core]
+    remote = gdrive_remote
+['remote "gdrive_remote"']
+    url = gdrive://1NlfYjPD2SPXKWUlnyokowPaRQsCh6alw
+    gdrive_use_service_account = true
+    gdrive_service_account_json_file_path = /Users/amalayrania/Desktop/eng-cache-454110-t0-156536d73e0f.json
