@@ -103,5 +103,5 @@ def movie_plot_ml_pipeline():
 if __name__ == "__main__":
     client = Client()
     pipeline_instance = movie_plot_ml_pipeline()
-    run = pipeline_instance.create_run()
+    run = pipeline_instance.run()
     print(f"Started pipeline run: {run}")
