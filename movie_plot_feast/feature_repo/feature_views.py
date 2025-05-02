@@ -1,25 +1,27 @@
-# In movie_plot_feast/feature_repo/feature_views.py
+# movie_plot_feast/feature_repo/feature_store.py
 
-from feast import Field, FeatureView, Entity
+from feast import Entity, FeatureView, Field, FileSource
 from feast.types import Float32, String
-from feast.infra.offline_stores.file_source import FileSource
 import os
 
-# Assuming you have a function to get the root directory
+# Dynamically set ROOT_DIR
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Define the file source
+# Define Entity
+movie_entity = Entity(
+    name="movie_entity",
+    description="A unique identifier for movies"
+)
+
+# Define File Source
 movie_features_source = FileSource(
     path=os.path.join(ROOT_DIR, "movie_plot_feast", "feature_repo", "data", "movie_features.parquet"),
     timestamp_field="event_timestamp",
 )
 
-# Create an entity
-movie_entity = Entity(name="movie")
-
-# Modify the feature view definition
+# Define Feature View
 movie_features_view = FeatureView(
-    name="movie_features",
+    name="movie_features_view",
     entities=[movie_entity],
     schema=[
         Field(name="movie_id", dtype=String),
@@ -30,4 +32,5 @@ movie_features_view = FeatureView(
     ],
     source=movie_features_source,
     online=True,
+    ttl=None
 )
