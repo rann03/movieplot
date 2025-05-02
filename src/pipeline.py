@@ -12,6 +12,7 @@ sys.path.append(ROOT_DIR)
 RAW_DATA_CSV = os.path.join(ROOT_DIR, "data", "wiki_movie_plots.csv")
 FEAST_REPO_DIR = os.path.join(ROOT_DIR, "move_plot_feast", "feature_repo")
 FEAST_DATA_PATH = os.path.join(FEAST_REPO_DIR, "data", "movie_features.parquet")
+DB_PATH = os.path.join(ROOT_DIR, "data", "movie_features.db")
 
 from ingestion import ingest_data
 from preprocessing import preprocess_data
