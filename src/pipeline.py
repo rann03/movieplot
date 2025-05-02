@@ -48,49 +48,65 @@ def version_data_step(df: pd.DataFrame) -> str:
     return save_path
 
 @step(enable_cache=False)
-def create_feature_parquet_step(df: pd.DataFrame) -> str:
-    import numpy as np
-    import uuid
-    import datetime
-
+def create_features_step(df: pd.DataFrame):
+    """
+    Centralized feature engineering step
+    - Generates features
+    - Prepares data for Feast
+    """
     from sklearn.feature_extraction.text import TfidfVectorizer
+    import uuid
+
+    # Ensure data directory exists
+    os.makedirs(os.path.join(FEAST_REPO_DIR, "data"), exist_ok=True)
 
     # Add movie_id if missing
     if "movie_id" not in df.columns:
         df = df.copy()
         df["movie_id"] = [str(uuid.uuid4()) for _ in range(len(df))]
 
-    # Compute TF-IDF features (using only first 2 components for example)
-    vectorizer = TfidfVectorizer(max_features=5000, stop_words="english", ngram_range=(1,2))
+    # TF-IDF Vectorization
+    vectorizer = TfidfVectorizer(
+        max_features=5000, 
+        stop_words="english", 
+        ngram_range=(1,2)
+    )
     tfidf_matrix = vectorizer.fit_transform(df["Plot"])
     tfidf_dense = tfidf_matrix.toarray()
 
-    # Build dataframe with movie_id, timestamp and feature columns
-    features_df = pd.DataFrame({
-        "movie_id": df["movie_id"],
-        "event_timestamp": datetime.datetime.utcnow(),
-        "tfidf_1": tfidf_dense[:, 0],
-        "tfidf_2": tfidf_dense[:, 1],
-    })
+    # Add features to dataframe
+    df["tfidf_1"] = tfidf_dense[:, 0]
+    df["tfidf_2"] = tfidf_dense[:, 1]
+    
+    # Optional: save feature metadata or vectorizer
+    import joblib
+    joblib.dump(vectorizer, os.path.join(FEAST_REPO_DIR, "data", "tfidf_vectorizer.pkl"))
 
-    os.makedirs(os.path.join(FEAST_REPO_DIR, "data"), exist_ok=True)
-    features_df.to_parquet(FEAST_DATA_PATH, index=False)
-
-    print(f"Created Feast feature parquet at: {FEAST_DATA_PATH}")
-    return FEAST_DATA_PATH
+    return df
 
 @step(enable_cache=False)
-def feast_apply_and_materialize_step():
-    try:
-        # Run feast apply to register feature definitions
-        subprocess.run(["feast", "apply"], cwd=FEAST_REPO_DIR, check=True)
+def feast_apply_and_materialize_step(parquet_path: str):
+    """Apply Feast features and materialize"""
+    from feast import FeatureStore
+    from datetime import datetime
 
-        # Materialize features for all available data (incremental)
-        subprocess.run(["feast", "materialize-incremental"], cwd=FEAST_REPO_DIR, check=True)
+    try:
+        # Initialize Feast store
+        store = FeatureStore(repo_path=FEAST_REPO_DIR)
+
+        # Apply feature definitions
+        store.apply(str(FEAST_REPO_DIR))
+
+        # Get current time as end timestamp
+        end_time = datetime.utcnow()
+
+        # Materialize features incrementally
+        store.materialize_incremental(end_time)
 
         print("Feast feature store registered and materialized.")
-    except subprocess.CalledProcessError as e:
-        print(f"Error executing Feast commands: {e}")
+    except Exception as e:
+        print(f"Error in Feast operations: {e}")
+        raise
 
 @pipeline
 def movie_plot_ml_pipeline():
@@ -98,8 +114,8 @@ def movie_plot_ml_pipeline():
     df_valid = validate_data_step(df_raw)
     df_preprocessed = preprocess_data_step(df_valid)
     _ = version_data_step(df_preprocessed)
-    _ = create_feature_parquet_step(df_preprocessed)
-    feast_apply_and_materialize_step()
+    df_featured = create_features_step(df_preprocessed)
+    feast_apply_and_materialize_step(df_featured)
 
 if __name__ == "__main__":
     client = Client()
