@@ -1,4 +1,3 @@
-# ingestion.py
 import pandas as pd
 import sqlite3
 import os
@@ -20,22 +19,17 @@ def check_directory_writable(directory):
         sys.exit(1)
 
 def ingest_data(csv_path: str) -> pd.DataFrame:
-    # Ensure data directory exists
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     os.makedirs(os.path.dirname(PARQUET_PATH), exist_ok=True)
-
-    # Check if source file exists
     check_file_exists(csv_path)
     
     try:
-        # Read CSV file
         df = pd.read_csv(csv_path)
         
         if df.empty:
             print(f"Error: The file {csv_path} is empty.")
             sys.exit(1)
 
-        # Connect to SQLite and create table
         conn = sqlite3.connect(DB_PATH)
         conn.execute('''
         CREATE TABLE IF NOT EXISTS movies (
@@ -47,10 +41,7 @@ def ingest_data(csv_path: str) -> pd.DataFrame:
         )
         ''')
         
-        # Save to SQLite
         df.to_sql('movies', conn, if_exists='replace', index=False)
-        
-        # Save to Parquet
         df.to_parquet(PARQUET_PATH, index=False)
         
         print(f"Data successfully ingested into SQLite database: {DB_PATH}")
