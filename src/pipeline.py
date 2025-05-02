@@ -5,6 +5,9 @@ import pandas as pd
 from zenml.pipelines import pipeline
 from zenml.steps import step
 from zenml.client import Client
+from feast import FeatureStore
+from datetime import datetime
+
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(ROOT_DIR)
@@ -84,13 +87,36 @@ def create_features_step(df: pd.DataFrame):
 
     return df
 
+
 @step(enable_cache=False)
-def feast_apply_and_materialize_step(parquet_path: str):
-    """Apply Feast features and materialize"""
-    from feast import FeatureStore
-    from datetime import datetime
+def feast_apply_and_materialize_step(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Apply Feast features and materialize
+    
+    Args:
+        df: DataFrame with preprocessed and featured data
+    
+    Returns:
+        DataFrame with Feast features
+    """
 
     try:
+        # Ensure data directory exists
+        os.makedirs(os.path.join(FEAST_REPO_DIR, "data"), exist_ok=True)
+
+        # Create features dataframe for Feast
+        features_df = pd.DataFrame({
+            "movie_id": df["movie_id"] if "movie_id" in df.columns else range(len(df)),
+            "event_timestamp": datetime.utcnow(),
+            "tfidf_1": df["tfidf_1"] if "tfidf_1" in df.columns else 0,
+            "tfidf_2": df["tfidf_2"] if "tfidf_2" in df.columns else 0,
+            "Plot": df["Plot"]
+        })
+
+        # Save to parquet for Feast
+        parquet_path = os.path.join(FEAST_REPO_DIR, "data", "movie_features.parquet")
+        features_df.to_parquet(parquet_path, index=False)
+
         # Initialize Feast store
         store = FeatureStore(repo_path=FEAST_REPO_DIR)
 
@@ -104,6 +130,8 @@ def feast_apply_and_materialize_step(parquet_path: str):
         store.materialize_incremental(end_time)
 
         print("Feast feature store registered and materialized.")
+        return features_df
+
     except Exception as e:
         print(f"Error in Feast operations: {e}")
         raise
@@ -114,8 +142,12 @@ def movie_plot_ml_pipeline():
     df_valid = validate_data_step(df_raw)
     df_preprocessed = preprocess_data_step(df_valid)
     _ = version_data_step(df_preprocessed)
+    
+    # Optional: Add feature engineering step if not already in preprocessing
     df_featured = create_features_step(df_preprocessed)
-    feast_apply_and_materialize_step(df_featured)
+    
+    # Materialize Feast features and return DataFrame
+    feast_df = feast_apply_and_materialize_step(df_featured)
 
 if __name__ == "__main__":
     client = Client()
