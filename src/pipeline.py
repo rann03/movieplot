@@ -4,7 +4,7 @@ import uuid
 import subprocess
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from feast import ValueType
 import pandas as pd
@@ -182,7 +182,7 @@ def create_feast_resources(features_df: pd.DataFrame):
     return movie_entity, movie_features_view
 
 @step(enable_cache=False)
-def feast_apply_and_materialize_step(df: pd.DataFrame) -> pd.DataFrame:
+def feast_apply_and_materialize_step(df: pd.DataFrame) -> Dict[str, Any]:
     """Apply and materialize Feast feature store."""
     try:
         # Prepare features DataFrame with explicit timestamp
@@ -225,7 +225,14 @@ def feast_apply_and_materialize_step(df: pd.DataFrame) -> pd.DataFrame:
             raise
 
         logger.info("Feast feature store registered and materialized")
-        return features_df
+        
+        # Return a dictionary instead of a DataFrame
+        return {
+            "movie_ids": features_df["movie_id"].tolist(),
+            "tfidf_1": features_df["tfidf_1"].tolist(),
+            "tfidf_2": features_df["tfidf_2"].tolist(),
+            "plots": features_df["Plot"].tolist()
+        }
     except Exception as e:
         logger.error(f"Feast operations failed: {e}")
         raise
