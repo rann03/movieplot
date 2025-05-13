@@ -143,43 +143,39 @@ def version_data_step(df: pd.DataFrame) -> Optional[str]:
         logger.error(f"Version tracking failed: {e}")
         raise
 
-@step(enable_cache=False)
-def create_feast_resources(features_df: pd.DataFrame):
-    """Create Feast entity and feature view."""
-    if not all([FeatureStore, Entity, FeatureView, Field]):
-        raise ImportError("Feast resources cannot be created")
+@step
+def create_features_step(df: pd.DataFrame) -> pd.DataFrame:
+    """Create TF-IDF features."""
+    try:
+        # Add movie_id if not present
+        if "movie_id" not in df.columns:
+            df = df.copy()
+            df["movie_id"] = [str(uuid.uuid4()) for _ in range(len(df))]
 
-    # Define Movie Entity
-    movie_entity = Entity(
-        name="movie_entity", 
-        description="Movie identifier entity",
-        # Explicitly set value_type to address deprecation warning
-        value_type=ValueType.STRING
-    )
+        # TF-IDF Vectorization
+        vectorizer = TfidfVectorizer(
+            max_features=5000, 
+            stop_words="english", 
+            ngram_range=(1,2)
+        )
+        tfidf_matrix = vectorizer.fit_transform(df["Plot"])
+        tfidf_dense = tfidf_matrix.toarray()
 
-    # Define File Source
-    movie_features_source = FileSource(
-        path=FEAST_DATA_PATH,
-        timestamp_field="event_timestamp",
-    )
+        # Add first two TF-IDF features
+        df["tfidf_1"] = tfidf_dense[:, 0]
+        df["tfidf_2"] = tfidf_dense[:, 1]
+        
+        # Save vectorizer
+        joblib.dump(
+            vectorizer, 
+            os.path.join(FEAST_REPO_DIR, "data", "tfidf_vectorizer.pkl")
+        )
 
-    # Define Feature View
-    movie_features_view = FeatureView(
-        name="movie_features_view",
-        entities=[movie_entity],
-        schema=[
-            Field(name="movie_id", dtype=String),
-            Field(name="event_timestamp", dtype=String),
-            Field(name="tfidf_1", dtype=Float32),
-            Field(name="tfidf_2", dtype=Float32),
-            Field(name="Plot", dtype=String)
-        ],
-        source=movie_features_source,
-        online=True,
-        ttl=None
-    )
-
-    return movie_entity, movie_features_view
+        logger.info("TF-IDF features created successfully")
+        return df
+    except Exception as e:
+        logger.error(f"Feature creation failed: {e}")
+        raise
 
 @step(enable_cache=False)
 def feast_apply_and_materialize_step(df: pd.DataFrame) -> Dict[str, Any]:
@@ -244,7 +240,7 @@ def movie_plot_ml_pipeline():
     df_valid = validate_data_step(df_raw)
     df_preprocessed = preprocess_data_step(df_valid)
     _ = version_data_step(df_preprocessed)
-    df_featured = create_feast_resources(df_preprocessed)
+    df_featured = create_features_step(df_preprocessed)
     feast_df = feast_apply_and_materialize_step(df_featured)
 
 if __name__ == "__main__":
