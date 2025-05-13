@@ -49,41 +49,6 @@ FEAST_DATA_PATH = os.path.join(FEAST_REPO_DIR, "data", "movie_features.parquet")
 # Ensure Feast directories exist
 os.makedirs(os.path.join(FEAST_REPO_DIR, "data"), exist_ok=True)
 
-# Feast Entity and Feature View Definition
-def create_feast_resources():
-    """Create Feast entity and feature view."""
-    if not all([FeatureStore, Entity, FeatureView, Field]):
-        raise ImportError("Feast resources cannot be created")
-
-    # Define Movie Entity
-    movie_entity = Entity(
-        name="movie_entity", 
-        description="Movie identifier entity"
-    )
-
-    # Define File Source
-    movie_features_source = FileSource(
-        path=FEAST_DATA_PATH,
-        timestamp_field="event_timestamp",
-    )
-
-    # Define Feature View
-    movie_features_view = FeatureView(
-        name="movie_features_view",
-        entities=[movie_entity],
-        schema=[
-            Field(name="movie_id", dtype=String),
-            Field(name="event_timestamp", dtype=String),
-            Field(name="tfidf_1", dtype=Float32),
-            Field(name="tfidf_2", dtype=Float32),
-            Field(name="Plot", dtype=String)
-        ],
-        source=movie_features_source,
-        online=True,
-    )
-
-    return movie_entity, movie_features_view
-
 @step(enable_cache=False)
 def ingest_data_step() -> pd.DataFrame:
     """Ingest raw movie data."""
