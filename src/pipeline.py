@@ -6,6 +6,7 @@ import logging
 from datetime import datetime
 from typing import Optional
 
+from feast import ValueType
 import pandas as pd
 import joblib
 import numpy as np
@@ -143,47 +144,51 @@ def version_data_step(df: pd.DataFrame) -> Optional[str]:
         raise
 
 @step(enable_cache=False)
-def create_features_step(df: pd.DataFrame) -> pd.DataFrame:
-    """Create TF-IDF features."""
-    try:
-        # Add movie_id if not present
-        if "movie_id" not in df.columns:
-            df = df.copy()
-            df["movie_id"] = [str(uuid.uuid4()) for _ in range(len(df))]
+def create_feast_resources(features_df: pd.DataFrame):
+    """Create Feast entity and feature view."""
+    if not all([FeatureStore, Entity, FeatureView, Field]):
+        raise ImportError("Feast resources cannot be created")
 
-        # TF-IDF Vectorization
-        vectorizer = TfidfVectorizer(
-            max_features=5000, 
-            stop_words="english", 
-            ngram_range=(1,2)
-        )
-        tfidf_matrix = vectorizer.fit_transform(df["Plot"])
-        tfidf_dense = tfidf_matrix.toarray()
+    # Define Movie Entity
+    movie_entity = Entity(
+        name="movie_entity", 
+        description="Movie identifier entity",
+        # Explicitly set value_type to address deprecation warning
+        value_type=ValueType.STRING
+    )
 
-        # Add first two TF-IDF features
-        df["tfidf_1"] = tfidf_dense[:, 0]
-        df["tfidf_2"] = tfidf_dense[:, 1]
-        
-        # Save vectorizer
-        joblib.dump(
-            vectorizer, 
-            os.path.join(FEAST_REPO_DIR, "data", "tfidf_vectorizer.pkl")
-        )
+    # Define File Source
+    movie_features_source = FileSource(
+        path=FEAST_DATA_PATH,
+        timestamp_field="event_timestamp",
+    )
 
-        logger.info("TF-IDF features created successfully")
-        return df
-    except Exception as e:
-        logger.error(f"Feature creation failed: {e}")
-        raise
+    # Define Feature View
+    movie_features_view = FeatureView(
+        name="movie_features_view",
+        entities=[movie_entity],
+        schema=[
+            Field(name="movie_id", dtype=String),
+            Field(name="event_timestamp", dtype=String),
+            Field(name="tfidf_1", dtype=Float32),
+            Field(name="tfidf_2", dtype=Float32),
+            Field(name="Plot", dtype=String)
+        ],
+        source=movie_features_source,
+        online=True,
+        ttl=None
+    )
+
+    return movie_entity, movie_features_view
 
 @step(enable_cache=False)
 def feast_apply_and_materialize_step(df: pd.DataFrame) -> pd.DataFrame:
     """Apply and materialize Feast feature store."""
     try:
-        # Prepare features DataFrame
+        # Prepare features DataFrame with explicit timestamp
         features_df = pd.DataFrame({
             "movie_id": df["movie_id"],
-            "event_timestamp": datetime.utcnow(),
+            "event_timestamp": pd.Timestamp.utcnow(),  # Use pandas Timestamp
             "tfidf_1": df.get("tfidf_1", 0),
             "tfidf_2": df.get("tfidf_2", 0),
             "Plot": df["Plot"]
@@ -193,15 +198,31 @@ def feast_apply_and_materialize_step(df: pd.DataFrame) -> pd.DataFrame:
         features_df.to_parquet(FEAST_DATA_PATH, index=False)
 
         # Create Feast resources
-        movie_entity, movie_features_view = create_feast_resources()
+        movie_entity, movie_features_view = create_feast_resources(features_df)
 
-        # Initialize and apply Feast store
-        store = FeatureStore(repo_path=FEAST_REPO_DIR)
-        store.apply([movie_entity, movie_features_view])
+        # Initialize Feast store with explicit project name
+        store = FeatureStore(
+            repo_path=FEAST_REPO_DIR,
+            project="movie_plot_retrieval"  # Add explicit project name
+        )
+
+        # Debug: Print registered entities before applying
+        print("Current registered entities:", store.list_entities())
+
+        # Apply entities and feature views
+        try:
+            store.apply([movie_entity, movie_features_view])
+        except Exception as apply_error:
+            logger.error(f"Failed to apply Feast resources: {apply_error}")
+            raise
 
         # Materialize features
         end_time = datetime.utcnow()
-        store.materialize_incremental(end_time)
+        try:
+            store.materialize_incremental(end_time)
+        except Exception as materialize_error:
+            logger.error(f"Failed to materialize features: {materialize_error}")
+            raise
 
         logger.info("Feast feature store registered and materialized")
         return features_df
@@ -216,7 +237,7 @@ def movie_plot_ml_pipeline():
     df_valid = validate_data_step(df_raw)
     df_preprocessed = preprocess_data_step(df_valid)
     _ = version_data_step(df_preprocessed)
-    df_featured = create_features_step(df_preprocessed)
+    df_featured = create_feast_resources(df_preprocessed)
     feast_df = feast_apply_and_materialize_step(df_featured)
 
 if __name__ == "__main__":
