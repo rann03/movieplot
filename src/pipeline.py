@@ -4,9 +4,8 @@ import uuid
 import subprocess
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Optional, Dict, Any, List
 
-from feast import ValueType
 import pandas as pd
 import joblib
 import numpy as np
@@ -17,12 +16,12 @@ from zenml.steps import step
 from zenml.client import Client
 
 try:
-    from feast import FeatureStore, Entity, FeatureView, Field
+    from feast import FeatureStore, Entity, FeatureView, Field, ValueType
     from feast.types import Float32, String
     from feast.infra.offline_stores.file_source import FileSource
 except ImportError:
     logging.error("Feast or its dependencies not installed.")
-    FeatureStore = Entity = FeatureView = Field = None
+    FeatureStore = Entity = FeatureView = Field = ValueType = None
 
 # Configure logging
 logging.basicConfig(
@@ -49,34 +48,7 @@ FEAST_DATA_PATH = os.path.join(FEAST_REPO_DIR, "data", "movie_features.parquet")
 # Ensure Feast directories exist
 os.makedirs(os.path.join(FEAST_REPO_DIR, "data"), exist_ok=True)
 
-def dataframe_to_dict(df: pd.DataFrame) -> Dict[str, Any]:
-    """Convert DataFrame to a dictionary for ZenML materialization."""
-    return {
-        "columns": df.columns.tolist(),
-        "data": df.to_dict(orient="records"),
-        "index": df.index.tolist()
-    }
-
-def dict_to_dataframe(data_dict: Dict[str, Any]) -> pd.DataFrame:
-    """Convert dictionary back to DataFrame."""
-    if not data_dict:
-        return pd.DataFrame()
-    
-    df = pd.DataFrame(data_dict.get("data", []))
-    
-    # Restore the column order if available
-    columns = data_dict.get("columns")
-    if columns and len(columns) > 0:
-        df = df[columns]
-        
-    # Restore the index if available
-    index = data_dict.get("index")
-    if index:
-        df.index = index
-        
-    return df
-
-@step(enable_cache=False)
+@step
 def ingest_data_step() -> pd.DataFrame:
     """Ingest raw movie data."""
     try:
@@ -87,7 +59,7 @@ def ingest_data_step() -> pd.DataFrame:
         logger.error(f"Data ingestion failed: {e}")
         raise
 
-@step(enable_cache=False)
+@step
 def validate_data_step(df: pd.DataFrame) -> pd.DataFrame:
     """Validate ingested data."""
     try:
@@ -98,7 +70,7 @@ def validate_data_step(df: pd.DataFrame) -> pd.DataFrame:
         logger.error(f"Data validation failed: {e}")
         raise
 
-@step(enable_cache=False)
+@step
 def preprocess_data_step(df: pd.DataFrame) -> pd.DataFrame:
     """Preprocess validated data."""
     try:
@@ -109,8 +81,8 @@ def preprocess_data_step(df: pd.DataFrame) -> pd.DataFrame:
         logger.error(f"Data preprocessing failed: {e}")
         raise
 
-@step(enable_cache=False)
-def version_data_step(df: pd.DataFrame) -> Optional[str]:
+@step
+def version_data_step(df: pd.DataFrame) -> str:
     """Version data using DVC."""
     try:
         save_path = save_versioned_csv(df)
@@ -169,14 +141,11 @@ def create_features_step(df: pd.DataFrame) -> pd.DataFrame:
         logger.error(f"Feature creation failed: {e}")
         raise
 
-@step(enable_cache=False)
-def feast_apply_and_materialize_step(df_dict: Dict[str, Any]) -> Dict[str, Any]:
+@step
+def feast_apply_and_materialize_step(df: pd.DataFrame) -> List[str]:
     """Apply and materialize Feast feature store."""
     try:
-        # Convert dictionary back to DataFrame
-        df = dict_to_dataframe(df_dict)
-        
-        # Prepare features DataFrame with explicit timestamp
+        # Prepare features DataFrame
         features_df = pd.DataFrame({
             "movie_id": df["movie_id"],
             "event_timestamp": pd.Timestamp.utcnow(),
@@ -222,12 +191,6 @@ def feast_apply_and_materialize_step(df_dict: Dict[str, Any]) -> Dict[str, Any]:
             project="movie_plot_retrieval"
         )
 
-        # Debug: Print registered entities before applying
-        try:
-            print("Current registered entities:", store.list_entities())
-        except Exception as e:
-            logger.warning(f"Could not list entities: {e}")
-
         # Apply entities and feature views
         try:
             store.apply([movie_entity, movie_features_view])
@@ -247,22 +210,10 @@ def feast_apply_and_materialize_step(df_dict: Dict[str, Any]) -> Dict[str, Any]:
 
         logger.info("Feast feature store registered and materialized")
         
-        # Return a dictionary instead of a DataFrame
-        return {
-            "feature_store_info": {
-                "repo_path": FEAST_REPO_DIR,
-                "entity_name": movie_entity.name,
-                "feature_view_name": movie_features_view.name,
-                "num_features": len(features_df),
-                "materialization_time": str(end_time)
-            },
-            "feature_data": {
-                "movie_ids": features_df["movie_id"].tolist()[:10],  # Just store a sample
-                "feature_columns": features_df.columns.tolist()
-            }
-        }
+        # Return a simple list of movie IDs (ZenML can easily materialize this)
+        return features_df["movie_id"].tolist()[:10]  # Just return a few for validation
     except Exception as e:
-        logger.error(f"Feast operations failed: {e}", exc_info=True)  # Include full traceback
+        logger.error(f"Feast operations failed: {e}", exc_info=True)
         raise
 
 @pipeline
@@ -271,9 +222,9 @@ def movie_plot_ml_pipeline():
     df_raw = ingest_data_step()
     df_valid = validate_data_step(df_raw)
     df_preprocessed = preprocess_data_step(df_valid)
-    _ = version_data_step(df_preprocessed)
+    version_path = version_data_step(df_preprocessed)
     df_featured = create_features_step(df_preprocessed)
-    feast_df = feast_apply_and_materialize_step(df_featured)
+    movie_ids = feast_apply_and_materialize_step(df_featured)
 
 if __name__ == "__main__":
     client = Client()
