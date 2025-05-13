@@ -49,6 +49,33 @@ FEAST_DATA_PATH = os.path.join(FEAST_REPO_DIR, "data", "movie_features.parquet")
 # Ensure Feast directories exist
 os.makedirs(os.path.join(FEAST_REPO_DIR, "data"), exist_ok=True)
 
+def dataframe_to_dict(df: pd.DataFrame) -> Dict[str, Any]:
+    """Convert DataFrame to a dictionary for ZenML materialization."""
+    return {
+        "columns": df.columns.tolist(),
+        "data": df.to_dict(orient="records"),
+        "index": df.index.tolist()
+    }
+
+def dict_to_dataframe(data_dict: Dict[str, Any]) -> pd.DataFrame:
+    """Convert dictionary back to DataFrame."""
+    if not data_dict:
+        return pd.DataFrame()
+    
+    df = pd.DataFrame(data_dict.get("data", []))
+    
+    # Restore the column order if available
+    columns = data_dict.get("columns")
+    if columns and len(columns) > 0:
+        df = df[columns]
+        
+    # Restore the index if available
+    index = data_dict.get("index")
+    if index:
+        df.index = index
+        
+    return df
+
 @step(enable_cache=False)
 def ingest_data_step() -> pd.DataFrame:
     """Ingest raw movie data."""
@@ -143,13 +170,16 @@ def create_features_step(df: pd.DataFrame) -> pd.DataFrame:
         raise
 
 @step(enable_cache=False)
-def feast_apply_and_materialize_step(df: pd.DataFrame) -> Dict[str, Any]:
+def feast_apply_and_materialize_step(df_dict: Dict[str, Any]) -> Dict[str, Any]:
     """Apply and materialize Feast feature store."""
     try:
+        # Convert dictionary back to DataFrame
+        df = dict_to_dataframe(df_dict)
+        
         # Prepare features DataFrame with explicit timestamp
         features_df = pd.DataFrame({
             "movie_id": df["movie_id"],
-            "event_timestamp": pd.Timestamp.utcnow(),  # Use pandas Timestamp
+            "event_timestamp": pd.Timestamp.utcnow(),
             "tfidf_1": df.get("tfidf_1", 0),
             "tfidf_2": df.get("tfidf_2", 0),
             "Plot": df["Plot"]
@@ -158,21 +188,50 @@ def feast_apply_and_materialize_step(df: pd.DataFrame) -> Dict[str, Any]:
         # Save to Parquet
         features_df.to_parquet(FEAST_DATA_PATH, index=False)
 
-        # Create Feast resources
-        movie_entity, movie_features_view = create_feast_resources(features_df)
+        # Define Feast resources directly in this step
+        movie_entity = Entity(
+            name="movie_entity", 
+            description="Movie identifier entity",
+            value_type=ValueType.STRING  # Add value_type to resolve deprecation warning
+        )
+
+        # Define File Source
+        movie_features_source = FileSource(
+            path=FEAST_DATA_PATH,
+            timestamp_field="event_timestamp",
+        )
+
+        # Define Feature View
+        movie_features_view = FeatureView(
+            name="movie_features_view",
+            entities=[movie_entity],
+            schema=[
+                Field(name="movie_id", dtype=String),
+                Field(name="event_timestamp", dtype=String),
+                Field(name="tfidf_1", dtype=Float32),
+                Field(name="tfidf_2", dtype=Float32),
+                Field(name="Plot", dtype=String)
+            ],
+            source=movie_features_source,
+            online=True,
+        )
 
         # Initialize Feast store with explicit project name
         store = FeatureStore(
             repo_path=FEAST_REPO_DIR,
-            project="movie_plot_retrieval"  # Add explicit project name
+            project="movie_plot_retrieval"
         )
 
         # Debug: Print registered entities before applying
-        print("Current registered entities:", store.list_entities())
+        try:
+            print("Current registered entities:", store.list_entities())
+        except Exception as e:
+            logger.warning(f"Could not list entities: {e}")
 
         # Apply entities and feature views
         try:
             store.apply([movie_entity, movie_features_view])
+            logger.info("Successfully applied Feast resources")
         except Exception as apply_error:
             logger.error(f"Failed to apply Feast resources: {apply_error}")
             raise
@@ -181,6 +240,7 @@ def feast_apply_and_materialize_step(df: pd.DataFrame) -> Dict[str, Any]:
         end_time = datetime.utcnow()
         try:
             store.materialize_incremental(end_time)
+            logger.info("Successfully materialized features")
         except Exception as materialize_error:
             logger.error(f"Failed to materialize features: {materialize_error}")
             raise
@@ -189,13 +249,20 @@ def feast_apply_and_materialize_step(df: pd.DataFrame) -> Dict[str, Any]:
         
         # Return a dictionary instead of a DataFrame
         return {
-            "movie_ids": features_df["movie_id"].tolist(),
-            "tfidf_1": features_df["tfidf_1"].tolist(),
-            "tfidf_2": features_df["tfidf_2"].tolist(),
-            "plots": features_df["Plot"].tolist()
+            "feature_store_info": {
+                "repo_path": FEAST_REPO_DIR,
+                "entity_name": movie_entity.name,
+                "feature_view_name": movie_features_view.name,
+                "num_features": len(features_df),
+                "materialization_time": str(end_time)
+            },
+            "feature_data": {
+                "movie_ids": features_df["movie_id"].tolist()[:10],  # Just store a sample
+                "feature_columns": features_df.columns.tolist()
+            }
         }
     except Exception as e:
-        logger.error(f"Feast operations failed: {e}")
+        logger.error(f"Feast operations failed: {e}", exc_info=True)  # Include full traceback
         raise
 
 @pipeline
