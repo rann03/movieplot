@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments - In case you create one at the root later
+.env
+.venv
+env/
+venv/
+ENV/
+VENV/
+env.bak/
+venv.bak/
+
+# MLflow
+mlruns/
+src/mlruns/ # Be specific if it's nested
+
+# Feast feature store data (if managed by Feast and large/binary)
+# Adjust paths as necessary based on your Feast setup and what should be ignored.
+# If registry.db and online_store.db are small and you want to track their schema
+# definition changes, you might reconsider, but typically their *data content* shouldn't be in git.
+movie_plot_feast/feature_repo/data/registry.db
+movie_plot_feast/feature_repo/data/online_store.db
+movie_plot_feast/feature_repo/data/*.parquet
+movie_plot_feast/feature_repo/data/*.pkl
+
+# Data files managed by DVC (DVC tracks them, Git tracks the .dvc files)
+# This tells Git to ignore the actual data files if DVC is managing them.
+# Be careful with broad patterns if some data in these dirs ISN'T DVC-managed and SHOULD be in Git.
+data/ingested/*.csv
+data/movie_features.db
+data/movie_features.parquet
+data/wiki_movie_plots.csv # If also large and/or managed by DVC
+# If all files in 'data/ingested/' are DVC managed, you could do:
+# data/ingested/*
+# !data/ingested/*.dvc # Keep the .dvc files
+# Or even more broadly for the main data dir:
+# data/*
+# !data/*.dvc # Keep .dvc files in the root of data/
+# !data/ingested/ # And then re-specify for subdirs if needed
+# !data/ingested/*.dvc
+
+# For the src/data/ingested files too
+src/data/ingested/*.csv
+
+# Other common ignores
+*.log
+*.sqlite3
+*.db # General rule for database files unless they are small, config-like
+*.parquet # General rule for parquet files
+*.pkl # General rule for pickle files
+
+# IDE / Editor specific
+.vscode/
+.idea/
+*.DS_Store
