@@ -1,0 +1,37 @@
+name: 🧪 Model Accuracy Evaluation
+
+# 🖱️ Trigger manually from GitHub Actions tab
+on:
+  workflow_dispatch:
+
+jobs:
+  model-accuracy-eval:
+    name: 🔬 Evaluate Models on Test Plots
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v3
+
+      - name: 🐍 Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install mlflow python-dotenv
+
+      - name: 🚀 Run accuracy evaluation script
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+          LLM_API_URL: https://openrouter.ai/api/v1/chat/completions
+        run: python scripts/model_accuracy_eval.py
+
+      - name: 📦 Upload MLflow results
+        if: always()  # run even if the test fails
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlflow-accuracy-results
+          path: mlruns/

@@ -16,3 +16,6 @@ def dvc_track(filepath: str):
         print(f"Tracked {filepath} with DVC.")
     except Exception as e:
         print(f"Failed to track {filepath} with DVC: {e}")
+
+
+        

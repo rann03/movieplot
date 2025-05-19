@@ -1,0 +1,163 @@
+name: 🧪 Full CI Pipeline
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
+
+jobs:
+  unit-tests:
+    name: ✅ Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install pytest and deps
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
+          
+      - name: Run pytest
+        run: |
+          cp .env.test .env
+          pytest tests/
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+  coverage:
+    name: 📊 Code Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install coverage
+        run: |
+          pip install -r requirements.txt
+          pip install coverage pytest pytest-asyncio httpx
+
+      - name: Run coverage check
+        run: |
+          cp .env.test .env
+          coverage run -m pytest
+          coverage report --fail-under=80
+
+  lint:
+    name: 🔍 Lint (pylint)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install pylint
+        run: |
+          pip install -r requirements.txt
+          pip install pylint
+
+      - name: Run pylint
+        run: pylint app/ --fail-under=8.5
+
+  format:
+    name: 🎨 Code Format Check (black)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install black
+        run: |
+          pip install -r requirements.txt
+          pip install black
+
+      - name: Run black check
+        run: black --check app/ tests/
+
+  mypy-check:
+    name: 📐 Static Typing (mypy)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install mypy
+        run: |
+          pip install -r requirements.txt
+          pip install mypy
+
+      - name: Run mypy
+        run: mypy app/
+
+  secrets-scan:
+    name: 🔐 Secrets Scan (detect-secrets)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install detect-secrets & jq
+        run: |
+          pip install detect-secrets
+          sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Run secrets scan
+        run: |
+          detect-secrets scan app/ frontend/ tests/ > .secrets.baseline
+          COUNT=$(jq '.results | map(.[] | length) | add' .secrets.baseline)
+          echo "🔐 Detected secrets: $COUNT"
+          if [ "$COUNT" -gt 0 ]; then
+            echo "❌ Secrets found in codebase!"
+            exit 1
+          fi
+
+      - name: 📦 Upload secrets report
+        if: always()  # even on failure
+        uses: actions/upload-artifact@v4
+        with:
+          name: secrets-scan-report
+          path: .secrets.baseline
+
+  docker-backend:
+    name: 🐳 Build Backend Image
+    needs: [unit-tests]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build backend image
+        run: docker build -t chatbox-backend ./app
+
+  docker-frontend:
+    name: 🐳 Build Frontend Image
+    needs: [unit-tests]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build frontend image
+        run: docker build -t chatbox-frontend ./frontend

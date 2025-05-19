@@ -9,3 +9,5 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     if "Genre" in df.columns:
         df["Genre"] = df["Genre"].fillna("unknown").str.strip()
     return df.reset_index(drop=True)
+
+
