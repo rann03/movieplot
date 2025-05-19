@@ -1,42 +1,0 @@
-
-]
-=
-movie_idUnique movie id"movie_idJmovie_plot_retrieval
-ÛÍÔÀà £†ÛÍÔÀà £†
-r
-R
-movie_entityA unique identifier for movies"movie_entityJmovie_plot_retrieval
-÷ÔÀÀÑÉ¥¯áŠÁø±Ä‘
-d
-F
-movieA unique identifier for movies"movieJmovie_plot_retrieval
-ÛäŠÁàñ“/²š¤ÁĞèš%
-J
-+
-__dummy"
-__dummy_idJmovie_plot_retrieval
-ÛÍÔÀĞ·«†²š¤ÁèÔ%1"$999bef6f-3a69-47e2-bccc-655f5448e191*²š¤ÁĞâ%2â
-Á
-movie_features_viewmovie_plot_retrievalmovie_entity"
-movie_id"
-event_timestamp"
-tfidf_1"
-tfidf_2"
-Plot:¼event_timestampZyw/Users/amalayrania/Desktop/Movie Plot Retrieval - LLM Chatbox/movie_plot_feast/feature_repo/data/movie_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢w/Users/amalayrania/Desktop/Movie Plot Retrieval - LLM Chatbox/movie_plot_feast/feature_repo/data/movie_features.parquet@
-÷ÔÀ Ó¾¥¯áŠÁÈÚ’‘2ø
-À
-movie_featuresmovie_plot_retrievalmovie"
-movie_id"
-event_timestamp"
-tfidf_1"
-tfidf_2"
-Plot:¼event_timestampZyw/Users/amalayrania/Desktop/Movie Plot Retrieval - LLM Chatbox/movie_plot_feast/feature_repo/data/movie_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢w/Users/amalayrania/Desktop/Movie Plot Retrieval - LLM Chatbox/movie_plot_feast/feature_repo/data/movie_features.parquet@b	
-movie3
-ÛÍÔÀ ¾®†²š¤Áèüç$
-ª‹Õ±ø‚”ÅÀçÒÀR¼
-¹
-,feast.infra.online_stores.sqlite.SqliteTable"ˆ
-a/Users/amalayrania/Desktop/Movie Plot Retrieval/move_plot_feast/feature_repo/data/online_store.db#movie_plot_retrieval_movie_featuresbµevent_timestampZjh/Users/amalayrania/Desktop/Movie Plot Retrieval/move_plot_feast/feature_repo/data/movie_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢h/Users/amalayrania/Desktop/Movie Plot Retrieval/move_plot_feast/feature_repo/data/movie_features.parquetªmovie_plot_retrievalb·event_timestampZki/Users/amalayrania/Desktop/Movie Plot Retrieval/movie_plot_feast/feature_repo/data/movie_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢i/Users/amalayrania/Desktop/Movie Plot Retrieval/movie_plot_feast/feature_repo/data/movie_features.parquetªmovie_plot_retrievalbÓevent_timestampZyw/Users/amalayrania/Desktop/Movie Plot Retrieval - LLM Chatbox/movie_plot_feast/feature_repo/data/movie_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢w/Users/amalayrania/Desktop/Movie Plot Retrieval - LLM Chatbox/movie_plot_feast/feature_repo/data/movie_features.parquetªmovie_plot_retrievalŠ4
-
-movie_plot_retrieval
-ÛÍÔÀÀ²Š{ÛÍÔÀÀ²Š{
